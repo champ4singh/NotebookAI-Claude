@@ -1,0 +1,11 @@
+/* Modern App Styles - Apple Design System */
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Remove any default Vite styling that might interfere */
+.card {
+  /* Reset default card styles */
+}
