@@ -180,6 +180,21 @@ async def update_document(
     
     return Document(**result.data[0])
 
+@router.get("/content/{document_id}")
+async def get_document_content(
+    document_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    # Get document and verify access through notebook ownership
+    result = supabase_admin.table("documents").select("content, notebooks!inner(user_id)").eq("id", document_id).execute()
+    if not result.data or result.data[0]["notebooks"]["user_id"] != current_user["id"]:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    return {"content": result.data[0]["content"]}
+
 @router.delete("/document/{document_id}")
 async def delete_document(
     document_id: str,

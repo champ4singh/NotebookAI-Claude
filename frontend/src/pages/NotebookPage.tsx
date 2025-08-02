@@ -21,7 +21,8 @@ import {
   Users,
   Clock,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  X
 } from 'lucide-react';
 
 export const NotebookPage: React.FC = () => {
@@ -39,6 +40,7 @@ export const NotebookPage: React.FC = () => {
   // Chat state
   const [message, setMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [clearingChat, setClearingChat] = useState(false);
   
   // Note state
   const [newNote, setNewNote] = useState('');
@@ -46,6 +48,16 @@ export const NotebookPage: React.FC = () => {
   
   // Upload state
   const [uploading, setUploading] = useState(false);
+  
+  // Document viewer state
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  const [documentContent, setDocumentContent] = useState<string>('');
+  const [loadingContent, setLoadingContent] = useState(false);
+  const [showDocumentViewer, setShowDocumentViewer] = useState(false);
+  
+  // Note viewer state
+  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+  const [showNoteViewer, setShowNoteViewer] = useState(false);
   
   // Active tab state
   const [activeTab, setActiveTab] = useState<'chat' | 'documents' | 'notes'>('chat');
@@ -65,6 +77,30 @@ export const NotebookPage: React.FC = () => {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [chatHistory]);
+
+  useEffect(() => {
+    // Handle keyboard shortcuts for viewers
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (showDocumentViewer) {
+          closeDocumentViewer();
+        } else if (showNoteViewer) {
+          closeNoteViewer();
+        }
+      }
+    };
+
+    if (showDocumentViewer || showNoteViewer) {
+      document.addEventListener('keydown', handleKeyDown);
+      // Prevent body scroll when modal is open
+      document.body.style.overflow = 'hidden';
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'unset';
+    };
+  }, [showDocumentViewer, showNoteViewer]);
 
   const loadNotebook = async () => {
     try {
@@ -135,9 +171,12 @@ export const NotebookPage: React.FC = () => {
 
     try {
       const response = await apiService.sendMessage(id!, userMessage);
-      setChatHistory([...chatHistory, response]);
+      // Add the new message to chat history and refresh the display
+      setChatHistory(prevHistory => [...prevHistory, response]);
     } catch (error) {
       console.error('Failed to send message:', error);
+      // Restore message on error
+      setMessage(userMessage);
     } finally {
       setSendingMessage(false);
     }
@@ -168,6 +207,26 @@ export const NotebookPage: React.FC = () => {
     }
   };
 
+  const clearChatHistory = async () => {
+    if (!confirm('Are you sure you want to clear all chat history? This action cannot be undone.')) return;
+    
+    setClearingChat(true);
+    try {
+      // Clear chat history from backend
+      await apiService.clearChatHistory(id!);
+      
+      // Clear chat history from state for immediate UI update
+      setChatHistory([]);
+      
+    } catch (error) {
+      console.error('Failed to clear chat history:', error);
+      // Reload chat history if clearing failed
+      loadChatHistory();
+    } finally {
+      setClearingChat(false);
+    }
+  };
+
   const deleteDocument = async (docId: string) => {
     if (!confirm('Are you sure you want to delete this document?')) return;
     
@@ -176,6 +235,55 @@ export const NotebookPage: React.FC = () => {
       setDocuments(documents.filter(doc => doc.id !== docId));
     } catch (error) {
       console.error('Failed to delete document:', error);
+    }
+  };
+
+  const viewDocument = async (document: Document) => {
+    setSelectedDocument(document);
+    setLoadingContent(true);
+    setShowDocumentViewer(true);
+    
+    try {
+      const response = await apiService.getDocumentContent(document.id);
+      setDocumentContent(response.content);
+    } catch (error) {
+      console.error('Failed to load document content:', error);
+      setDocumentContent('Error loading document content. Please try again.');
+    } finally {
+      setLoadingContent(false);
+    }
+  };
+
+  const closeDocumentViewer = () => {
+    setShowDocumentViewer(false);
+    setSelectedDocument(null);
+    setDocumentContent('');
+    setLoadingContent(false);
+  };
+
+  const viewNote = (note: Note) => {
+    setSelectedNote(note);
+    setShowNoteViewer(true);
+  };
+
+  const closeNoteViewer = () => {
+    setShowNoteViewer(false);
+    setSelectedNote(null);
+  };
+
+  const deleteNote = async (noteId: string) => {
+    if (!confirm('Are you sure you want to delete this note? This action cannot be undone.')) return;
+    
+    try {
+      await apiService.deleteNote(noteId);
+      setNotes(notes.filter(note => note.id !== noteId));
+      
+      // Close note viewer if the deleted note is currently being viewed
+      if (selectedNote?.id === noteId) {
+        closeNoteViewer();
+      }
+    } catch (error) {
+      console.error('Failed to delete note:', error);
     }
   };
 
@@ -320,16 +428,33 @@ export const NotebookPage: React.FC = () => {
                         <p className="text-sm text-gray-500">Powered by advanced AI</p>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2 text-xs text-gray-500">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span>Online</span>
+                    <div className="flex items-center space-x-4">
+                      {chatHistory.length > 0 && (
+                        <button
+                          onClick={clearChatHistory}
+                          disabled={clearingChat}
+                          className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Clear chat history"
+                        >
+                          {clearingChat ? (
+                            <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                          <span>Clear Chat</span>
+                        </button>
+                      )}
+                      <div className="flex items-center space-x-2 text-xs text-gray-500">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span>Online</span>
+                      </div>
                     </div>
                   </div>
 
                   {/* Chat Messages */}
                   <div 
                     ref={chatContainerRef}
-                    className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide"
+                    className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-custom"
                   >
                     {chatHistory.length === 0 ? (
                       <div className="text-center py-16">
@@ -352,34 +477,63 @@ export const NotebookPage: React.FC = () => {
                       chatHistory.map((chat, index) => (
                         <div key={chat.id} className="space-y-4 animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
                           {/* User Message */}
-                          <div className="flex justify-end">
-                            <div className="max-w-[80%] bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-4 rounded-2xl rounded-br-lg shadow-lg">
-                              <p className="text-sm leading-relaxed">{chat.user_prompt}</p>
+                          <div className="flex justify-end items-start space-x-3">
+                            <div className="max-w-[75%] bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-2xl rounded-tr-lg shadow-lg overflow-hidden">
+                              <div className="px-6 py-4">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <div className="w-2 h-2 bg-white/40 rounded-full"></div>
+                                  <span className="text-xs font-medium text-white/80 uppercase tracking-wide">You</span>
+                                </div>
+                                <p className="text-white leading-relaxed text-sm whitespace-pre-wrap">{chat.user_prompt}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-center w-8 h-8 bg-white border-2 border-blue-200 rounded-full flex-shrink-0 mt-1">
+                              <div className="w-4 h-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full"></div>
                             </div>
                           </div>
                           
                           {/* AI Response */}
-                          <div className="flex justify-start">
-                            <div className="max-w-[85%] bg-white border border-gray-200 px-6 py-4 rounded-2xl rounded-bl-lg shadow-sm">
-                              <p className="text-sm leading-relaxed text-gray-900 mb-4">{chat.ai_response}</p>
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-3 text-xs text-gray-500">
-                                  <div className="flex items-center space-x-1">
-                                    <Brain className="w-3 h-3" />
-                                    <span>AI Assistant</span>
-                                  </div>
-                                  <div className="flex items-center space-x-1">
-                                    <Clock className="w-3 h-3" />
-                                    <span>{new Date(chat.created_at).toLocaleTimeString()}</span>
+                          <div className="flex justify-start items-start space-x-3">
+                            <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex-shrink-0 mt-1">
+                              <Brain className="w-4 h-4 text-white" />
+                            </div>
+                            <div className="max-w-[80%] bg-gradient-to-br from-slate-50 to-gray-50 border border-gray-200 rounded-2xl rounded-tl-lg shadow-sm overflow-hidden">
+                              <div className="px-6 py-4">
+                                <div className="flex items-center space-x-2 mb-3">
+                                  <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">AI Assistant</span>
+                                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                </div>
+                                <div className="prose prose-sm max-w-none">
+                                  <div className="text-gray-900 leading-relaxed whitespace-pre-wrap text-sm">
+                                    {chat.ai_response}
                                   </div>
                                 </div>
-                                <button
-                                  onClick={() => saveAsNote(chat.id)}
-                                  className="flex items-center space-x-1 px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                                >
-                                  <Save className="w-3 h-3" />
-                                  <span>Save as Note</span>
-                                </button>
+                              </div>
+                              <div className="px-6 py-3 bg-white border-t border-gray-100 flex items-center justify-between">
+                                <div className="flex items-center space-x-4 text-xs text-gray-500">
+                                  <div className="flex items-center space-x-1">
+                                    <Clock className="w-3 h-3" />
+                                    <span>{new Date(chat.created_at).toLocaleString('en-US', {
+                                      hour: 'numeric',
+                                      minute: '2-digit',
+                                      hour12: true
+                                    })}</span>
+                                  </div>
+                                  <div className="w-px h-3 bg-gray-300"></div>
+                                  <div className="flex items-center space-x-1">
+                                    <Sparkles className="w-3 h-3" />
+                                    <span>AI Generated</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <button
+                                    onClick={() => saveAsNote(chat.id)}
+                                    className="flex items-center space-x-1 px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-all duration-200 hover:scale-105"
+                                  >
+                                    <Save className="w-3 h-3" />
+                                    <span>Save as Note</span>
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -389,15 +543,24 @@ export const NotebookPage: React.FC = () => {
                     
                     {/* Loading indicator for new message */}
                     {sendingMessage && (
-                      <div className="flex justify-start animate-fade-in">
-                        <div className="max-w-[85%] bg-white border border-gray-200 px-6 py-4 rounded-2xl rounded-bl-lg shadow-sm">
-                          <div className="flex items-center space-x-3 text-gray-500">
-                            <div className="flex space-x-1">
-                              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="flex justify-start items-start space-x-3 animate-fade-in">
+                        <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex-shrink-0 mt-1">
+                          <Brain className="w-4 h-4 text-white animate-pulse" />
+                        </div>
+                        <div className="max-w-[80%] bg-gradient-to-br from-slate-50 to-gray-50 border border-gray-200 rounded-2xl rounded-tl-lg shadow-sm overflow-hidden">
+                          <div className="px-6 py-4">
+                            <div className="flex items-center space-x-2 mb-3">
+                              <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">AI Assistant</span>
+                              <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
                             </div>
-                            <span className="text-xs">AI is thinking...</span>
+                            <div className="flex items-center space-x-3 text-gray-500">
+                              <div className="flex space-x-1">
+                                <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
+                                <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                                <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                              </div>
+                              <span className="text-sm font-medium">AI is thinking...</span>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -483,7 +646,11 @@ export const NotebookPage: React.FC = () => {
                             </div>
                           </div>
                           <div className="opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
-                            <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                            <button 
+                              onClick={() => viewDocument(doc)}
+                              className="p-2 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors"
+                              title="View document"
+                            >
                               <Eye className="w-4 h-4 text-gray-500" />
                             </button>
                             <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -571,7 +738,7 @@ export const NotebookPage: React.FC = () => {
                     {notes.map((note, index) => (
                       <div
                         key={note.id}
-                        className="card-modern animate-fade-in"
+                        className="card-modern group animate-fade-in"
                         style={{ animationDelay: `${index * 100}ms` }}
                       >
                         <div className="flex items-start space-x-4">
@@ -579,7 +746,27 @@ export const NotebookPage: React.FC = () => {
                             <StickyNote className="w-5 h-5 text-white" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-gray-900 leading-relaxed mb-4">{note.content}</p>
+                            <div className="flex items-start justify-between mb-3">
+                              <p className="text-gray-900 leading-relaxed line-clamp-3 flex-1">
+                                {note.content.length > 150 ? `${note.content.substring(0, 150)}...` : note.content}
+                              </p>
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1 ml-3">
+                                <button 
+                                  onClick={() => viewNote(note)}
+                                  className="p-2 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors"
+                                  title="View full note"
+                                >
+                                  <Eye className="w-4 h-4 text-gray-500" />
+                                </button>
+                                <button 
+                                  onClick={() => deleteNote(note.id)}
+                                  className="p-2 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"
+                                  title="Delete note"
+                                >
+                                  <Trash2 className="w-4 h-4 text-gray-500" />
+                                </button>
+                              </div>
+                            </div>
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-4 text-xs text-gray-500">
                                 <span className={`inline-flex items-center px-2 py-1 rounded-lg font-medium ${
@@ -610,9 +797,14 @@ export const NotebookPage: React.FC = () => {
                                   </span>
                                 </div>
                               </div>
-                              <button className="p-2 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                              {note.content.length > 150 && (
+                                <button 
+                                  onClick={() => viewNote(note)}
+                                  className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                                >
+                                  Read more
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -703,6 +895,194 @@ export const NotebookPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Document Viewer Modal */}
+      {showDocumentViewer && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full h-[90vh] max-h-[90vh] flex flex-col animate-fade-in">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl">
+                  <FileText className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">{selectedDocument?.filename}</h2>
+                  <p className="text-sm text-gray-500 uppercase tracking-wide">
+                    {selectedDocument?.file_type} • {selectedDocument && new Date(selectedDocument.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={closeDocumentViewer}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-hidden">
+              {loadingContent ? (
+                <div className="flex flex-col items-center justify-center h-96 space-y-4">
+                  <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  <div className="text-center">
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Loading document...</h3>
+                    <p className="text-sm text-gray-500">Please wait while we prepare your document</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-full overflow-y-auto scrollbar-document p-6">
+                  <div className="prose prose-slate max-w-none">
+                    {selectedDocument?.file_type === 'pdf' || selectedDocument?.file_type === 'txt' || selectedDocument?.file_type === 'md' ? (
+                      <div className="bg-white border border-gray-200 rounded-xl p-8 shadow-sm min-h-[400px]">
+                        <div className="text-gray-900 leading-relaxed whitespace-pre-wrap text-base">
+                          {documentContent || 'No content available'}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-gray-50 rounded-xl p-6 font-mono text-sm leading-relaxed whitespace-pre-wrap min-h-[400px]">
+                        {documentContent || 'No content available'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
+              <div className="flex items-center space-x-4 text-sm text-gray-600">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-600" />
+                  <span>Processed & Ready</span>
+                </div>
+                <div className="w-px h-4 bg-gray-300"></div>
+                <div className="flex items-center space-x-2">
+                  <span>📜</span>
+                  <span>Scroll to read complete document</span>
+                </div>
+                <div className="w-px h-4 bg-gray-300"></div>
+                <span>Press Esc to close</span>
+              </div>
+              <div className="flex space-x-3">
+                <button className="btn-ghost">
+                  <Download className="w-4 h-4 mr-2" />
+                  Download
+                </button>
+                <button 
+                  onClick={closeDocumentViewer}
+                  className="btn-primary"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Note Viewer Modal */}
+      {showNoteViewer && selectedNote && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full h-[80vh] max-h-[80vh] flex flex-col animate-fade-in">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-xl">
+                  <StickyNote className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Note Details</h2>
+                  <div className="flex items-center space-x-3 text-sm text-gray-500">
+                    <span className={`inline-flex items-center px-2 py-1 rounded-lg font-medium ${
+                      selectedNote.source_type === 'ai_generated' 
+                        ? 'bg-purple-100 text-purple-700'
+                        : 'bg-green-100 text-green-700'
+                    }`}>
+                      {selectedNote.source_type === 'ai_generated' ? (
+                        <>
+                          <Brain className="w-3 h-3 mr-1" />
+                          AI Generated
+                        </>
+                      ) : (
+                        <>
+                          <Users className="w-3 h-3 mr-1" />
+                          Manual
+                        </>
+                      )}
+                    </span>
+                    <span>•</span>
+                    <span>{new Date(selectedNote.created_at).toLocaleDateString('en-US', {
+                      weekday: 'short',
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}</span>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={closeNoteViewer}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-hidden">
+              <div className="h-full overflow-y-auto scrollbar-document p-6">
+                <div className="prose prose-slate max-w-none">
+                  <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl p-8 shadow-sm min-h-[400px]">
+                    <div className="text-gray-900 leading-relaxed whitespace-pre-wrap text-base">
+                      {selectedNote.content}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
+              <div className="flex items-center space-x-4 text-sm text-gray-600">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-600" />
+                  <span>Note Ready</span>
+                </div>
+                <div className="w-px h-4 bg-gray-300"></div>
+                <div className="flex items-center space-x-2">
+                  <span>📝</span>
+                  <span>Full note content displayed</span>
+                </div>
+                <div className="w-px h-4 bg-gray-300"></div>
+                <span>Press Esc to close</span>
+              </div>
+              <div className="flex space-x-3">
+                <button className="btn-ghost">
+                  <Save className="w-4 h-4 mr-2" />
+                  Edit
+                </button>
+                <button 
+                  onClick={() => selectedNote && deleteNote(selectedNote.id)}
+                  className="btn-ghost text-red-600 hover:bg-red-50"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
+                </button>
+                <button 
+                  onClick={closeNoteViewer}
+                  className="btn-primary"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

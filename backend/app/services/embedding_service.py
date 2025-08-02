@@ -60,24 +60,51 @@ class EmbeddingService:
         """Search for similar document chunks using vector similarity"""
         
         try:
+            print(f"=== EMBEDDING SEARCH DEBUG ===")
+            print(f"Query: {query}")
+            print(f"Notebook ID: {notebook_id}")
+            print(f"User ID: {user_id}")
+            print(f"Limit: {limit}")
+            
+            # First, let's check what documents exist for this notebook
+            docs_result = supabase_admin.table("documents").select("id, filename, embedding_id").eq("notebook_id", notebook_id).execute()
+            print(f"Documents in notebook: {docs_result.data}")
+            
+            # Check if there are embeddings for these documents
+            if docs_result.data:
+                doc_ids = [doc['id'] for doc in docs_result.data]
+                embeddings_for_notebook = supabase_admin.table("document_embeddings").select("document_id, content").in_("document_id", doc_ids).execute()
+                print(f"Embeddings for this notebook: {len(embeddings_for_notebook.data)} chunks")
+                for emb in embeddings_for_notebook.data[:2]:
+                    print(f"  - Doc ID: {emb['document_id']}, Content: {emb['content'][:50]}...")
+            
             # Generate query embedding
+            print("Generating query embedding...")
             query_embedding = self._generate_embedding(query)
+            print(f"Query embedding generated: {len(query_embedding)} dimensions")
             
             # Perform vector search using Supabase RPC function
+            print("Performing vector search...")
             result = supabase_admin.rpc(
                 'match_documents',
                 {
                     'query_embedding': query_embedding,
                     'p_notebook_id': notebook_id,
                     'p_user_id': user_id,
-                    'match_threshold': 0.7,
+                    'match_threshold': 0.3,  # Lower threshold for debugging
                     'match_count': limit
                 }
             ).execute()
             
+            print(f"RPC result: {result}")
+            print(f"Found {len(result.data)} matches")
+            
             return result.data
             
         except Exception as e:
+            print(f"Vector search error: {str(e)}")
+            import traceback
+            traceback.print_exc()
             raise Exception(f"Vector search failed: {str(e)}")
     
     async def delete_embeddings(self, embedding_id: str):

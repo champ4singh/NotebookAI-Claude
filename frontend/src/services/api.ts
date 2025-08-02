@@ -144,6 +144,11 @@ class ApiService {
     await this.api.delete(`/documents/document/${id}`);
   }
 
+  async getDocumentContent(id: string): Promise<{ content: string }> {
+    const response = await this.api.get(`/documents/content/${id}`);
+    return response.data;
+  }
+
   // Chat endpoints
   async sendMessage(notebookId: string, message: string): Promise<ChatMessage> {
     const response = await this.api.post('/chat/', {
@@ -160,6 +165,10 @@ class ApiService {
 
   async deleteChatMessage(id: string): Promise<void> {
     await this.api.delete(`/chat/${id}`);
+  }
+
+  async clearChatHistory(notebookId: string): Promise<void> {
+    await this.api.delete(`/chat/clear/${notebookId}`);
   }
 
   // Notes endpoints

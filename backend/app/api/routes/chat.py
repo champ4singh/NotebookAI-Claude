@@ -91,3 +91,21 @@ async def delete_chat_message(
     supabase_admin.table("chat_history").delete().eq("id", chat_id).execute()
     
     return {"message": "Chat message deleted successfully"}
+
+@router.delete("/clear/{notebook_id}")
+async def clear_chat_history(
+    notebook_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    # Verify notebook belongs to user
+    notebook_check = supabase_admin.table("notebooks").select("*").eq("id", notebook_id).eq("user_id", current_user["id"]).execute()
+    if not notebook_check.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Notebook not found"
+        )
+    
+    # Delete all chat history for the notebook
+    supabase_admin.table("chat_history").delete().eq("notebook_id", notebook_id).execute()
+    
+    return {"message": "Chat history cleared successfully"}

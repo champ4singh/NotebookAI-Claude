@@ -17,21 +17,43 @@ class RAGService:
         """Generate AI response using RAG (Retrieval-Augmented Generation)"""
         
         try:
+            print(f"=== RAG SERVICE DEBUG ===")
+            print(f"Question: {question}")
+            print(f"Notebook ID: {notebook_id}")
+            print(f"User ID: {user_id}")
+            
             # 1. Retrieve relevant document chunks
+            print("Step 1: Retrieving relevant document chunks...")
             relevant_chunks = await self.embedding_service.search_similar(
                 query=question,
                 notebook_id=notebook_id,
                 user_id=user_id,
                 limit=5
             )
+            print(f"Found {len(relevant_chunks)} relevant chunks")
+            if relevant_chunks:
+                print("Sample chunk content:", relevant_chunks[0].get('content', '')[:100] + "...")
+            
+            # Fallback: If no chunks found, get document content directly
+            if not relevant_chunks:
+                print("No chunks found via vector search, trying fallback...")
+                relevant_chunks = await self._fallback_document_search(notebook_id, question)
+                print(f"Fallback found {len(relevant_chunks)} chunks")
             
             # 2. Get document information for citations
+            print("Step 2: Getting document information...")
             document_info = await self._get_document_info(notebook_id)
+            print(f"Found {len(document_info)} documents: {list(document_info.values())}")
             
             # 3. Prepare context from retrieved chunks
+            print("Step 3: Preparing context...")
             context = self._prepare_context(relevant_chunks, document_info)
+            print(f"Context length: {len(context)} characters")
+            if context:
+                print("Context preview:", context[:200] + "...")
             
             # 4. Generate response using LLM
+            print("Step 4: Generating LLM response...")
             response, citations = await self._generate_llm_response(question, context)
             
             # 5. Prepare metadata
@@ -41,15 +63,41 @@ class RAGService:
                 "documents_referenced": list(set([chunk.get("document_id") for chunk in relevant_chunks]))
             }
             
+            print(f"=== RAG SERVICE COMPLETE ===")
             return response, metadata
             
         except Exception as e:
+            print(f"RAG Service Error: {str(e)}")
+            import traceback
+            traceback.print_exc()
             raise Exception(f"Failed to generate RAG response: {str(e)}")
+    
+    async def _fallback_document_search(self, notebook_id: str, question: str) -> List[Dict[str, Any]]:
+        """Fallback: Get document content directly when vector search fails"""
+        from app.models.database import supabase_admin
+        
+        # Get all documents for this notebook
+        result = supabase_admin.table("documents").select("id, filename, content").eq("notebook_id", notebook_id).execute()
+        
+        chunks = []
+        for doc in result.data:
+            # For now, just return the full document content as chunks
+            # In a more sophisticated version, we could do text search or split into chunks
+            content = doc.get("content", "")
+            if content and len(content) > 100:  # Only include documents with substantial content
+                chunks.append({
+                    "document_id": doc["id"],
+                    "content": content[:2000],  # Limit to first 2000 chars for context window
+                    "similarity": 0.5  # Default similarity score
+                })
+        
+        return chunks
     
     async def _get_document_info(self, notebook_id: str) -> Dict[str, Dict[str, Any]]:
         """Get document information for citation purposes"""
+        from app.models.database import supabase_admin
         
-        result = supabase.table("documents").select("id, filename, file_type").eq("notebook_id", notebook_id).execute()
+        result = supabase_admin.table("documents").select("id, filename, file_type").eq("notebook_id", notebook_id).execute()
         
         document_info = {}
         for doc in result.data:
