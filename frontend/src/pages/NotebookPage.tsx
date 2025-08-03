@@ -611,7 +611,7 @@ Format as a clear timeline with dates/periods and descriptions. Focus on the tem
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-xl border-b border-white/20 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
-          <div className="flex items-center justify-between py-6">
+          <div className="flex items-center justify-between py-3">
             {/* Navigation */}
             <div className="flex items-center space-x-6">
               <button
@@ -622,34 +622,34 @@ Format as a clear timeline with dates/periods and descriptions. Focus on the tem
                 Dashboard
               </button>
               
-              <div className="h-8 w-px bg-gray-200"></div>
+              <div className="h-6 w-px bg-gray-200"></div>
               
-              <div className="flex items-center space-x-3">
-                <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl">
-                  <Brain className="w-5 h-5 text-white" />
+              <div className="flex items-center space-x-2">
+                <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg">
+                  <Brain className="w-4 h-4 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-gray-900">{notebook?.title}</h1>
-                  <p className="text-sm text-gray-500 font-medium">AI-Powered Workspace</p>
+                  <h1 className="text-lg font-bold text-gray-900">{notebook?.title}</h1>
+                  <p className="text-xs text-gray-500 font-medium">AI-Powered Workspace</p>
                 </div>
               </div>
             </div>
 
             {/* Quick Actions with Upload */}
-            <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-4">
               {/* Workspace Overview Stats */}
-              <div className="flex items-center space-x-6 bg-white rounded-2xl px-6 py-3 shadow-sm border border-gray-200">
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
-                  <span className="text-sm font-medium text-gray-900">{documents.length} Documents</span>
+              <div className="flex items-center space-x-4 bg-white rounded-xl px-4 py-2 shadow-sm border border-gray-200">
+                <div className="flex items-center space-x-1">
+                  <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                  <span className="text-xs font-medium text-gray-900">{documents.length} Documents</span>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 bg-purple-600 rounded-full"></div>
-                  <span className="text-sm font-medium text-gray-900">{chatHistory.length} Chats</span>
+                <div className="flex items-center space-x-1">
+                  <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
+                  <span className="text-xs font-medium text-gray-900">{chatHistory.length} Chats</span>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 bg-yellow-600 rounded-full"></div>
-                  <span className="text-sm font-medium text-gray-900">{notes.length} Notes</span>
+                <div className="flex items-center space-x-1">
+                  <div className="w-2 h-2 bg-yellow-600 rounded-full"></div>
+                  <span className="text-xs font-medium text-gray-900">{notes.length} Notes</span>
                 </div>
               </div>
               
@@ -714,7 +714,7 @@ Format as a clear timeline with dates/periods and descriptions. Focus on the tem
       </header>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-8">
+      <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-4">
 
         {/* Three-Pane Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[600px]">
@@ -727,7 +727,7 @@ Format as a clear timeline with dates/periods and descriptions. Focus on the tem
                     <FileText className="w-4 h-4 text-white" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900 text-sm">Sources</h3>
+                    <h3 className="font-semibold text-gray-900 text-xs">Sources</h3>
                   </div>
                 </div>
                 <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
@@ -754,7 +754,7 @@ Format as a clear timeline with dates/periods and descriptions. Focus on the tem
                         {selectAllDocuments && <Check className="w-3 h-3 text-white" />}
                       </div>
                     </div>
-                    <span className="text-sm font-medium text-gray-900">Select all sources</span>
+                    <span className="text-xs font-medium text-gray-900">Select all sources</span>
                   </label>
                 </div>
               )}
@@ -826,7 +826,7 @@ Format as a clear timeline with dates/periods and descriptions. Focus on the tem
                                 return <IconComponent className={`w-4 h-4 ${color} flex-shrink-0`} />;
                               })()}
                               <div className="flex-1 min-w-0">
-                                <h4 className="font-medium text-gray-900 text-sm truncate">{doc.filename}</h4>
+                                <h4 className="font-medium text-gray-900 text-xs truncate">{doc.filename}</h4>
                               </div>
                             </div>
                             
@@ -866,14 +866,14 @@ Format as a clear timeline with dates/periods and descriptions. Focus on the tem
           {/* Center Pane - Chat */}
           <div className="lg:col-span-6">
             <div className="card-modern h-full flex flex-col">
-              <div className="flex items-center justify-between p-6 border-b border-gray-100">
+              <div className="flex items-center justify-between p-4 border-b border-gray-100">
                 <div className="flex items-center space-x-3">
-                  <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl">
-                    <Brain className="w-5 h-5 text-white" />
+                  <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl">
+                    <Brain className="w-4 h-4 text-white" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-gray-900">AI Chat</h3>
-                    <p className="text-sm text-gray-500">
+                    <h3 className="font-semibold text-gray-900 text-xs">AI Chat</h3>
+                    <p className="text-xs text-gray-500">
                       {selectedDocuments.size > 0 
                         ? `Using ${selectedDocuments.size} selected source${selectedDocuments.size !== 1 ? 's' : ''}`
                         : 'Ask about your documents'
@@ -957,7 +957,7 @@ Format as a clear timeline with dates/periods and descriptions. Focus on the tem
                               <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">AI Assistant</span>
                               <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
                             </div>
-                            <div className="text-gray-900 text-sm leading-relaxed">
+                            <div className="text-gray-900 text-xs leading-relaxed">
                               <div className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-headings:font-bold prose-p:text-gray-800 prose-p:leading-relaxed prose-strong:text-gray-900 prose-strong:font-bold prose-ul:list-disc prose-ol:list-decimal prose-li:text-gray-800 prose-blockquote:border-l-blue-500 prose-blockquote:bg-blue-50 prose-blockquote:pl-4 prose-code:bg-gray-100 prose-code:px-1 prose-code:rounded">
                                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                   {chat.ai_response}
