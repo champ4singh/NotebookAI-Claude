@@ -332,31 +332,7 @@ export const NotebookPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Stats */}
-            <div className="flex items-center space-x-6 text-sm text-gray-600">
-              <div className="flex items-center space-x-2">
-                <FileText className="w-4 h-4" />
-                <span className="font-medium">{documents.length} docs</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <MessageSquare className="w-4 h-4" />
-                <span className="font-medium">{chatHistory.length} chats</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <StickyNote className="w-4 h-4" />
-                <span className="font-medium">{notes.length} notes</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-8">
-        {/* Quick Actions Header with Workspace Overview */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Quick Actions</h2>
+            {/* Quick Actions with Upload */}
             <div className="flex items-center space-x-6">
               {/* Workspace Overview Stats */}
               <div className="flex items-center space-x-6 bg-white rounded-2xl px-6 py-3 shadow-sm border border-gray-200">
@@ -404,6 +380,10 @@ export const NotebookPage: React.FC = () => {
             </div>
           </div>
         </div>
+      </header>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-8">
 
         {/* Three-Pane Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[600px]">
@@ -726,7 +706,7 @@ export const NotebookPage: React.FC = () => {
               </div>
 
               {/* Notes List */}
-              <div className="flex-1 overflow-y-auto p-3" style={{scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 #f1f5f9'}}>
+              <div className="overflow-y-scroll p-3 scrollbar-notes" style={{ height: '400px', minHeight: '400px', paddingBottom: '100px' }}>
                 {notes.length === 0 ? (
                   <div className="text-center py-16">
                     <div className="w-16 h-16 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-4 opacity-20">
