@@ -5,12 +5,18 @@ from app.models.database import supabase_admin
 from app.core.security import get_current_user
 from app.services.document_processor import DocumentProcessor
 from app.services.embedding_service import EmbeddingService
+from app.services.youtube_service import YouTubeService
+from pydantic import BaseModel
 import uuid
 from datetime import datetime
 
 router = APIRouter()
 doc_processor = DocumentProcessor()
 embedding_service = EmbeddingService()
+youtube_service = YouTubeService()
+
+class YouTubeRequest(BaseModel):
+    url: str
 
 @router.get("/test-embeddings-table")
 async def test_embeddings_table():
@@ -220,3 +226,83 @@ async def delete_document(
     supabase_admin.table("documents").delete().eq("id", document_id).execute()
     
     return {"message": "Document deleted successfully"}
+
+@router.post("/process-youtube/{notebook_id}", response_model=Document)
+async def process_youtube_url(
+    notebook_id: str,
+    youtube_request: YouTubeRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Process YouTube URL and extract transcript as document"""
+    print(f"=== YOUTUBE URL PROCESSING STARTED ===")
+    print(f"Notebook ID: {notebook_id}")
+    print(f"YouTube URL: {youtube_request.url}")
+    print(f"User: {current_user['email']}")
+    
+    # Verify notebook belongs to user
+    print(f"Checking notebook ownership...")
+    notebook_check = supabase_admin.table("notebooks").select("*").eq("id", notebook_id).eq("user_id", current_user["id"]).execute()
+    print(f"Notebook check result: {notebook_check}")
+    if not notebook_check.data:
+        print(f"Notebook not found or not owned by user")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Notebook not found"
+        )
+    
+    try:
+        # Process YouTube URL
+        print(f"Processing YouTube URL...")
+        youtube_data = youtube_service.process_youtube_url(youtube_request.url)
+        print(f"YouTube processed. Title: {youtube_data['title']}, Content length: {len(youtube_data['content'])}")
+        
+        document_id = str(uuid.uuid4())
+        print(f"Generated document ID: {document_id}")
+        
+        # Create document record
+        new_document = {
+            "id": document_id,
+            "notebook_id": notebook_id,
+            "filename": f"{youtube_data['title']}.txt",  # Use video title as filename
+            "file_type": "youtube",
+            "content": youtube_data['content'],
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        print(f"Inserting YouTube document into database...")
+        result = supabase_admin.table("documents").insert(new_document).execute()
+        print(f"Document insert result: {result}")
+        if not result.data:
+            print(f"Failed to insert YouTube document")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to save YouTube transcript"
+            )
+        
+        # Generate embeddings asynchronously
+        print(f"Starting embedding creation for YouTube document {document_id}")
+        try:
+            print(f"Content length: {len(youtube_data['content'])} characters")
+            embedding_id = await embedding_service.create_embeddings(document_id, youtube_data['content'])
+            print(f"Embeddings created successfully with ID: {embedding_id}")
+            
+            update_result = supabase_admin.table("documents").update({"embedding_id": embedding_id}).eq("id", document_id).execute()
+            print(f"Document updated with embedding_id: {update_result}")
+        except Exception as e:
+            print(f"Failed to create embeddings: {e}")
+            import traceback
+            traceback.print_exc()
+            raise e
+        
+        print(f"=== YOUTUBE URL PROCESSING COMPLETED ===")
+        return Document(**result.data[0])
+        
+    except Exception as e:
+        print(f"=== YOUTUBE URL PROCESSING FAILED ===")
+        print(f"Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to process YouTube URL: {str(e)}"
+        )

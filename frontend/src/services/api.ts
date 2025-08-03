@@ -125,6 +125,14 @@ class ApiService {
     return response.data;
   }
 
+  async processYouTubeUrl(notebookId: string, url: string): Promise<Document> {
+    // For YouTube URL processing, we'll send as JSON
+    const response = await this.api.post(`/documents/process-youtube/${notebookId}`, {
+      url
+    });
+    return response.data;
+  }
+
   async getDocuments(notebookId: string): Promise<Document[]> {
     const response = await this.api.get(`/documents/${notebookId}`);
     return response.data;

@@ -25,7 +25,8 @@ import {
   BookOpenCheck,
   FileBarChart,
   HelpCircle,
-  Calendar
+  Calendar,
+  Youtube
 } from 'lucide-react';
 
 // Utility function to strip markdown for preview
@@ -66,6 +67,8 @@ export const NotebookPage: React.FC = () => {
   
   // Upload state
   const [uploading, setUploading] = useState(false);
+  const [uploadingYoutube, setUploadingYoutube] = useState(false);
+  const [youtubeUrl, setYoutubeUrl] = useState('');
   
   // Document selection state
   const [selectedDocuments, setSelectedDocuments] = useState<Set<string>>(new Set());
@@ -177,6 +180,33 @@ export const NotebookPage: React.FC = () => {
       console.error('Failed to upload document:', error);
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleYouTubeUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!youtubeUrl.trim()) return;
+
+    setUploadingYoutube(true);
+    try {
+      const document = await apiService.processYouTubeUrl(id!, youtubeUrl.trim());
+      setDocuments([document, ...documents]);
+      setYoutubeUrl(''); // Clear the input
+    } catch (error: any) {
+      console.error('Failed to process YouTube URL:', error);
+      
+      // Extract error message from API response
+      let errorMessage = 'Failed to process YouTube URL. Please check the URL and try again.';
+      
+      if (error?.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
+      alert(errorMessage);
+    } finally {
+      setUploadingYoutube(false);
     }
   };
 
@@ -589,7 +619,7 @@ Format as a clear timeline with dates/periods and descriptions. Focus on the tem
                 </div>
               </div>
               
-              {/* Upload Button */}
+              {/* Upload Buttons */}
               <div className="flex space-x-3">
                 <input
                   ref={fileInputRef}
@@ -598,9 +628,11 @@ Format as a clear timeline with dates/periods and descriptions. Focus on the tem
                   className="hidden"
                   accept=".pdf,.docx,.xlsx,.pptx,.txt,.md"
                 />
+                
+                {/* File Upload Button */}
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
+                  disabled={uploading || uploadingYoutube}
                   className="btn-primary"
                 >
                   {uploading ? (
@@ -611,10 +643,36 @@ Format as a clear timeline with dates/periods and descriptions. Focus on the tem
                   ) : (
                     <div className="flex items-center">
                       <Upload className="w-4 h-4 mr-2" />
-                      Upload Document
+                      Upload File
                     </div>
                   )}
                 </button>
+
+                {/* YouTube URL Form */}
+                <div className="flex items-center bg-white rounded-lg border border-gray-200 shadow-sm">
+                  <form onSubmit={handleYouTubeUpload} className="flex items-center">
+                    <input
+                      type="url"
+                      value={youtubeUrl}
+                      onChange={(e) => setYoutubeUrl(e.target.value)}
+                      placeholder="YouTube URL (video must have captions)"
+                      className="px-3 py-2 border-0 rounded-l-lg focus:ring-0 focus:outline-none text-sm bg-transparent"
+                      disabled={uploadingYoutube || uploading}
+                      style={{ minWidth: '200px' }}
+                    />
+                    <button
+                      type="submit"
+                      disabled={!youtubeUrl.trim() || uploadingYoutube || uploading}
+                      className="flex items-center px-3 py-2 bg-red-600 text-white rounded-r-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    >
+                      {uploadingYoutube ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <Youtube className="w-4 h-4" />
+                      )}
+                    </button>
+                  </form>
+                </div>
               </div>
             </div>
           </div>
@@ -675,16 +733,27 @@ Format as a clear timeline with dates/periods and descriptions. Focus on the tem
                     </div>
                     <h3 className="text-sm font-bold text-gray-900 mb-2">No documents yet</h3>
                     <p className="text-gray-600 text-xs mb-4">
-                      Upload your first document to start building your knowledge base.
+                      Upload documents or add YouTube videos to start building your knowledge base.
                     </p>
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading}
-                      className="btn-primary btn-sm"
-                    >
-                      <Upload className="w-4 h-4 mr-2" />
-                      Upload Document
-                    </button>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                      <h4 className="text-xs font-medium text-blue-900 mb-1">YouTube Tips:</h4>
+                      <p className="text-xs text-blue-700">
+                        • Educational videos work best<br/>
+                        • Video must have captions/subtitles<br/>
+                        • TED Talks, tutorials, lectures usually have captions
+                      </p>
+                    </div>
+                    <div className="flex flex-col space-y-2">
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading || uploadingYoutube}
+                        className="btn-primary btn-sm"
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        Upload Document
+                      </button>
+                      <p className="text-xs text-gray-500">or add YouTube URL in the header</p>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-3">
