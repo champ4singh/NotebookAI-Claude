@@ -411,19 +411,48 @@ Keep it professional, concise, and suitable for management review. Focus on busi
     setGeneratingNote('FAQ');
     try {
       const selectedDocIds = Array.from(selectedDocuments);
-      const prompt = `Create a comprehensive FAQ (Frequently Asked Questions) based on the selected documents. Include:
+      const prompt = `Create a comprehensive FAQ (Frequently Asked Questions) with exactly 15 questions based on the selected documents. Structure it as follows:
 
-- **Common Questions** - What users typically ask about this topic
-- **Clear Answers** - Concise, helpful responses based on the document content
-- **Troubleshooting** - Common issues and their solutions
-- **Getting Started** - Basic questions for beginners
+## **EASY LEVEL QUESTIONS (5 Questions)**
+Create 5 basic, fundamental questions that beginners would ask. These should cover:
+- Basic definitions and concepts
+- Simple "what is" questions
+- Getting started information
+- Basic functionality
 
-Format as Q&A pairs, organized by topic if applicable. Make it user-friendly and practical.`;
+## **MEDIUM LEVEL QUESTIONS (5 Questions)** 
+Create 5 intermediate questions that require some understanding. These should cover:
+- How-to questions with multiple steps
+- Practical implementation scenarios
+- Common use cases and applications
+- Comparison questions
+
+## **DIFFICULT LEVEL QUESTIONS (5 Questions)**
+Create 5 advanced, complex questions for experts. These should cover:
+- Advanced troubleshooting scenarios
+- Complex integration challenges
+- Edge cases and limitations
+- Performance optimization
+- Advanced configuration
+
+**Format Requirements:**
+- Each section must have exactly 5 questions
+- Use clear Q&A format: **Q:** followed by **A:**
+- Number each question within its difficulty level (1-5)
+- Provide detailed, accurate answers based on the document content
+- Make answers practical and actionable
+
+Total: 15 questions (5 Easy + 5 Medium + 5 Difficult)`;
 
       const response = await apiService.sendMessage(id!, prompt, selectedDocIds);
       
       // Create a note from the response
-      const note = await apiService.createNote(id!, response.ai_response, 'ai_generated');
+      let noteContent = response.ai_response;
+      if (noteContent && noteContent.length > 10000) {
+        noteContent = noteContent.substring(0, 10000) + '\n\n... (Content truncated due to length)';
+      }
+      
+      const note = await apiService.createNote(id!, noteContent, 'ai_generated');
       setNotes([note, ...notes]);
     } catch (error) {
       console.error('Failed to generate FAQ:', error);
