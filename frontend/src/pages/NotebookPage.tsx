@@ -26,7 +26,10 @@ import {
   FileBarChart,
   HelpCircle,
   Calendar,
-  Youtube
+  Youtube,
+  FileSpreadsheet,
+  FileImage,
+  FileType
 } from 'lucide-react';
 
 // Utility function to strip markdown for preview
@@ -41,6 +44,37 @@ const stripMarkdown = (text: string): string => {
     .replace(/^\s*\d+\.\s+/gm, '') // Remove numbered lists
     .replace(/\n+/g, ' ') // Replace newlines with spaces
     .trim();
+};
+
+// Utility function to get file icon and color based on file type or filename
+const getFileIcon = (filename: string, file_type?: string) => {
+  const extension = filename.split('.').pop()?.toLowerCase();
+  const fileType = file_type?.toLowerCase() || extension;
+  
+  switch (fileType) {
+    case 'docx':
+    case 'doc':
+      return { icon: FileType, color: 'text-blue-600' }; // Microsoft Word - blue like Word
+    case 'xlsx':
+    case 'xls':
+    case 'excel':
+      return { icon: FileSpreadsheet, color: 'text-green-600' }; // Excel - green like Excel
+    case 'pdf':
+      return { icon: FileText, color: 'text-red-500' }; // PDF - red
+    case 'pptx':
+    case 'ppt':
+      return { icon: FileImage, color: 'text-orange-500' }; // PowerPoint - orange
+    case 'youtube':
+      return { icon: Youtube, color: 'text-red-600' }; // YouTube - red like YouTube
+    case 'txt':
+    case 'md':
+      return { icon: FileText, color: 'text-gray-500' }; // Text files - gray
+    case 'html':
+    case 'htm':
+      return { icon: FileText, color: 'text-purple-500' }; // HTML - purple
+    default:
+      return { icon: FileText, color: 'text-gray-500' }; // Default - gray
+  }
 };
 
 export const NotebookPage: React.FC = () => {
@@ -787,7 +821,10 @@ Format as a clear timeline with dates/periods and descriptions. Focus on the tem
                             
                             {/* Document Info */}
                             <div className="flex items-center space-x-2 flex-1 min-w-0">
-                              <FileText className="w-4 h-4 text-red-500 flex-shrink-0" />
+                              {(() => {
+                                const { icon: IconComponent, color } = getFileIcon(doc.filename, doc.file_type);
+                                return <IconComponent className={`w-4 h-4 ${color} flex-shrink-0`} />;
+                              })()}
                               <div className="flex-1 min-w-0">
                                 <h4 className="font-medium text-gray-900 text-sm truncate">{doc.filename}</h4>
                               </div>
@@ -1242,7 +1279,10 @@ Format as a clear timeline with dates/periods and descriptions. Focus on the tem
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <div className="flex items-center space-x-4">
                 <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl">
-                  <FileText className="w-6 h-6 text-white" />
+                  {(() => {
+                    const { icon: IconComponent } = getFileIcon(selectedDocument?.filename || '', selectedDocument?.file_type);
+                    return <IconComponent className="w-6 h-6 text-white" />;
+                  })()}
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">{selectedDocument?.filename}</h2>

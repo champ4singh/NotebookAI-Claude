@@ -49,6 +49,7 @@ class DocumentProcessor:
     
     async def _process_pdf(self, content: bytes) -> str:
         """Extract text from PDF"""
+        temp_file = None
         try:
             # Save temporarily
             temp_file = f"temp_{os.urandom(8).hex()}.pdf"
@@ -62,15 +63,21 @@ class DocumentProcessor:
                 for page in reader.pages:
                     text += page.extract_text() + "\n"
             
-            # Clean up
-            os.remove(temp_file)
             return text.strip()
             
         except Exception as e:
             raise ValueError(f"Failed to process PDF: {str(e)}")
+        finally:
+            # Clean up temp file if it exists
+            if temp_file and os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except PermissionError:
+                    print(f"Warning: Could not delete temporary file {temp_file}")
     
     async def _process_docx(self, content: bytes) -> str:
         """Extract text from DOCX"""
+        temp_file = None
         try:
             # Save temporarily
             temp_file = f"temp_{os.urandom(8).hex()}.docx"
@@ -81,15 +88,21 @@ class DocumentProcessor:
             doc = docx.Document(temp_file)
             text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
             
-            # Clean up
-            os.remove(temp_file)
             return text.strip()
             
         except Exception as e:
             raise ValueError(f"Failed to process DOCX: {str(e)}")
+        finally:
+            # Clean up temp file if it exists
+            if temp_file and os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except PermissionError:
+                    print(f"Warning: Could not delete temporary file {temp_file}")
     
     async def _process_excel(self, content: bytes) -> str:
         """Extract text from Excel"""
+        temp_file = None
         try:
             # Save temporarily
             temp_file = f"temp_{os.urandom(8).hex()}.xlsx"
@@ -100,28 +113,45 @@ class DocumentProcessor:
             workbook = openpyxl.load_workbook(temp_file)
             text = ""
             
-            for sheet_name in workbook.sheetnames:
-                sheet = workbook[sheet_name]
-                text += f"Sheet: {sheet_name}\n"
-                
-                for row in sheet.iter_rows():
-                    row_text = []
-                    for cell in row:
-                        if cell.value is not None:
-                            row_text.append(str(cell.value))
-                    if row_text:
-                        text += "\t".join(row_text) + "\n"
-                text += "\n"
+            try:
+                for sheet_name in workbook.sheetnames:
+                    sheet = workbook[sheet_name]
+                    text += f"Sheet: {sheet_name}\n"
+                    
+                    for row in sheet.iter_rows():
+                        row_text = []
+                        for cell in row:
+                            if cell.value is not None:
+                                row_text.append(str(cell.value))
+                        if row_text:
+                            text += "\t".join(row_text) + "\n"
+                    text += "\n"
+            finally:
+                # Always close the workbook
+                workbook.close()
             
-            # Clean up
-            os.remove(temp_file)
             return text.strip()
             
         except Exception as e:
             raise ValueError(f"Failed to process Excel: {str(e)}")
+        finally:
+            # Clean up temp file if it exists
+            if temp_file and os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except PermissionError:
+                    # If we can't delete immediately, try again after a short delay
+                    import time
+                    time.sleep(0.1)
+                    try:
+                        os.remove(temp_file)
+                    except PermissionError:
+                        # Log the issue but don't fail the operation
+                        print(f"Warning: Could not delete temporary file {temp_file}")
     
     async def _process_pptx(self, content: bytes) -> str:
         """Extract text from PowerPoint"""
+        temp_file = None
         try:
             # Save temporarily
             temp_file = f"temp_{os.urandom(8).hex()}.pptx"
@@ -139,12 +169,17 @@ class DocumentProcessor:
                         text += shape.text + "\n"
                 text += "\n"
             
-            # Clean up
-            os.remove(temp_file)
             return text.strip()
             
         except Exception as e:
             raise ValueError(f"Failed to process PowerPoint: {str(e)}")
+        finally:
+            # Clean up temp file if it exists
+            if temp_file and os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except PermissionError:
+                    print(f"Warning: Could not delete temporary file {temp_file}")
     
     async def _process_web_url(self, url: str) -> str:
         """Extract text from web URL"""
