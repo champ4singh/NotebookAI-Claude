@@ -3,6 +3,7 @@ from typing import Dict, Any, Tuple, List
 from app.core.config import settings
 from app.services.embedding_service import EmbeddingService
 from app.models.database import supabase
+import asyncio
 
 # Configure Google AI
 genai.configure(api_key=settings.google_api_key)
@@ -11,7 +12,14 @@ class RAGService:
     
     def __init__(self):
         self.embedding_service = EmbeddingService()
-        self.llm_model = genai.GenerativeModel(settings.llm_model)
+        # Define fallback models in order of preference
+        self.model_fallbacks = [
+            settings.llm_model,  # Primary model from config
+            "gemini-2.5-pro",    # High-quality fallback
+            "gemini-2.5-flash",  # Fast fallback
+            "gemini-2.5-flash-lite"  # Lightweight fallback
+        ]
+        self.current_model = None
     
     async def generate_response(self, question: str, notebook_id: str, user_id: str, selected_document_ids: List[str] = None) -> Tuple[str, Dict[str, Any]]:
         """Generate AI response using RAG (Retrieval-Augmented Generation)"""
@@ -62,7 +70,8 @@ class RAGService:
             metadata = {
                 "citations": citations,
                 "retrieved_chunks": len(relevant_chunks),
-                "documents_referenced": list(set([chunk.get("document_id") for chunk in relevant_chunks]))
+                "documents_referenced": list(set([chunk.get("document_id") for chunk in relevant_chunks])),
+                "model_used": getattr(self, 'current_model', 'unknown')
             }
             
             print(f"=== RAG SERVICE COMPLETE ===")
@@ -134,7 +143,7 @@ class RAGService:
         return "\n---\n".join(context_parts)
     
     async def _generate_llm_response(self, question: str, context: str) -> Tuple[str, List[Dict[str, Any]]]:
-        """Generate response using LLM with context"""
+        """Generate response using LLM with context and fallback mechanism"""
         
         prompt = f"""You are an AI assistant helping users understand and analyze their documents. Based on the provided context from the user's documents, answer the following question.
 
@@ -152,24 +161,61 @@ QUESTION: {question}
 
 RESPONSE:"""
 
-        try:
-            response = await self.llm_model.generate_content_async(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    max_output_tokens=settings.max_tokens,
-                    temperature=settings.temperature,
-                )
-            )
-            
-            response_text = response.text
-            
-            # Extract citations from response
-            citations = self._extract_citations(response_text)
-            
-            return response_text, citations
-            
-        except Exception as e:
-            raise Exception(f"LLM generation failed: {str(e)}")
+        last_error = None
+        
+        # Try each model in the fallback sequence
+        for i, model_name in enumerate(self.model_fallbacks):
+            try:
+                print(f"Attempting LLM generation with model: {model_name} (attempt {i+1}/{len(self.model_fallbacks)})")
+                
+                # Create model instance for this attempt
+                llm_model = genai.GenerativeModel(model_name)
+                
+                # Add timeout wrapper for the API call
+                try:
+                    response = await asyncio.wait_for(
+                        llm_model.generate_content_async(
+                            prompt,
+                            generation_config=genai.types.GenerationConfig(
+                                max_output_tokens=settings.max_tokens,
+                                temperature=settings.temperature,
+                            )
+                        ),
+                        timeout=60.0  # 60 second timeout
+                    )
+                except asyncio.TimeoutError:
+                    raise Exception(f"Request timeout after 60 seconds for model {model_name}")
+                
+                response_text = response.text
+                
+                # If we get here, the request was successful
+                print(f"✅ Successfully generated response using model: {model_name}")
+                self.current_model = model_name
+                
+                # Extract citations from response
+                citations = self._extract_citations(response_text)
+                
+                return response_text, citations
+                
+            except Exception as e:
+                last_error = e
+                error_msg = str(e).lower()
+                print(f"❌ Model {model_name} failed: {str(e)}")
+                
+                # Check for specific error types that indicate we should try the next model
+                if any(keyword in error_msg for keyword in ['timeout', 'rate limit', 'quota', 'unavailable', 'service unavailable', '503', '429', '500']):
+                    print(f"⚠️  Detected timeout/rate limit/service error, trying next model...")
+                    continue
+                elif 'not found' in error_msg or '404' in error_msg:
+                    print(f"⚠️  Model not found, trying next model...")
+                    continue
+                else:
+                    # For other errors, also try the next model
+                    print(f"⚠️  Unknown error, trying next model...")
+                    continue
+        
+        # If all models failed, raise the last error
+        raise Exception(f"All LLM models failed. Last error: {str(last_error)}")
     
     def _extract_citations(self, response_text: str) -> List[Dict[str, Any]]:
         """Extract citations from the response text"""
