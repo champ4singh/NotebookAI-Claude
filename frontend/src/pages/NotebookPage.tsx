@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiService } from '../services/api';
 import type { Notebook, Document, ChatMessage, Note } from '../types';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { 
   ArrowLeft, 
   Upload, 
@@ -25,6 +27,20 @@ import {
   HelpCircle,
   Calendar
 } from 'lucide-react';
+
+// Utility function to strip markdown for preview
+const stripMarkdown = (text: string): string => {
+  return text
+    .replace(/#{1,6}\s+/g, '') // Remove headers
+    .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold
+    .replace(/\*(.*?)\*/g, '$1') // Remove italic
+    .replace(/`(.*?)`/g, '$1') // Remove code
+    .replace(/\[(.*?)\]\(.*?\)/g, '$1') // Remove links
+    .replace(/^\s*[\*\-\+]\s+/gm, '') // Remove list markers
+    .replace(/^\s*\d+\.\s+/gm, '') // Remove numbered lists
+    .replace(/\n+/g, ' ') // Replace newlines with spaces
+    .trim();
+};
 
 export const NotebookPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -806,9 +822,11 @@ Format as a clear timeline with dates/periods and descriptions. Focus on the tem
                               <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">AI Assistant</span>
                               <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
                             </div>
-                            <div className="text-gray-900 text-xs whitespace-pre-wrap leading-relaxed">
-                              <div className="prose prose-sm max-w-none">
-                                {chat.ai_response}
+                            <div className="text-gray-900 text-sm leading-relaxed">
+                              <div className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-headings:font-bold prose-p:text-gray-800 prose-p:leading-relaxed prose-strong:text-gray-900 prose-strong:font-bold prose-ul:list-disc prose-ol:list-decimal prose-li:text-gray-800 prose-blockquote:border-l-blue-500 prose-blockquote:bg-blue-50 prose-blockquote:pl-4 prose-code:bg-gray-100 prose-code:px-1 prose-code:rounded">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                  {chat.ai_response}
+                                </ReactMarkdown>
                               </div>
                             </div>
                           </div>
@@ -1048,7 +1066,10 @@ Format as a clear timeline with dates/periods and descriptions. Focus on the tem
                       >
                         <div className="mb-3">
                           <p className="text-gray-900 text-xs leading-relaxed">
-                            {note.content.length > 140 ? `${note.content.substring(0, 140)}...` : note.content}
+                            {(() => {
+                              const stripped = stripMarkdown(note.content);
+                              return stripped.length > 140 ? `${stripped.substring(0, 140)}...` : stripped;
+                            })()}
                           </p>
                           <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
                             <button 
@@ -1256,8 +1277,12 @@ Format as a clear timeline with dates/periods and descriptions. Focus on the tem
               <div className="h-full overflow-y-auto scrollbar-document p-6">
                 <div className="prose prose-slate max-w-none">
                   <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl p-8 shadow-sm min-h-[400px]">
-                    <div className="text-gray-900 leading-relaxed whitespace-pre-wrap text-sm">
-                      {selectedNote.content}
+                    <div className="text-gray-900 leading-relaxed text-sm">
+                      <div className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-headings:font-bold prose-p:text-gray-800 prose-p:leading-relaxed prose-strong:text-gray-900 prose-strong:font-bold prose-ul:list-disc prose-ol:list-decimal prose-li:text-gray-800 prose-blockquote:border-l-yellow-500 prose-blockquote:bg-yellow-50 prose-blockquote:pl-4 prose-code:bg-yellow-100 prose-code:px-1 prose-code:rounded">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {selectedNote.content}
+                        </ReactMarkdown>
+                      </div>
                     </div>
                   </div>
                 </div>
