@@ -29,7 +29,9 @@ import {
   Youtube,
   FileSpreadsheet,
   FileImage,
-  FileType
+  FileType,
+  Trash,
+  FileDown
 } from 'lucide-react';
 
 // Utility function to strip markdown for preview
@@ -371,6 +373,61 @@ export const NotebookPage: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to delete note:', error);
+    }
+  };
+
+  const clearAllNotes = async () => {
+    if (!confirm(`Are you sure you want to delete all ${notes.length} notes? This action cannot be undone.`)) return;
+    
+    try {
+      // Delete all notes
+      await Promise.all(notes.map(note => apiService.deleteNote(note.id)));
+      setNotes([]);
+      
+      // Close note viewer if open
+      if (selectedNote) {
+        closeNoteViewer();
+      }
+    } catch (error) {
+      console.error('Failed to clear all notes:', error);
+      alert('Failed to clear all notes. Please try again.');
+    }
+  };
+
+  const exportNotesToPDF = async () => {
+    if (notes.length === 0) {
+      alert('No notes to export.');
+      return;
+    }
+
+    try {
+      // Create PDF content
+      let pdfContent = `# Notes Export - ${notebook?.title}\n\n`;
+      pdfContent += `Generated on: ${new Date().toLocaleDateString()}\n`;
+      pdfContent += `Total Notes: ${notes.length}\n\n`;
+      pdfContent += '---\n\n';
+
+      notes.forEach((note, index) => {
+        pdfContent += `## Note ${index + 1}\n\n`;
+        pdfContent += `**Type:** ${note.source_type === 'ai_generated' ? 'AI Generated' : 'Manual'}\n\n`;
+        pdfContent += `**Created:** ${new Date(note.created_at).toLocaleDateString()}\n\n`;
+        pdfContent += `**Content:**\n\n${note.content}\n\n`;
+        pdfContent += '---\n\n';
+      });
+
+      // Create and download file
+      const blob = new Blob([pdfContent], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `notes-export-${notebook?.title || 'notebook'}-${new Date().toISOString().split('T')[0]}.md`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to export notes:', error);
+      alert('Failed to export notes. Please try again.');
     }
   };
 
@@ -1078,7 +1135,7 @@ Format as a clear timeline with dates/periods and descriptions. Focus on the tem
           {/* Right Pane - Notes */}
           <div className="lg:col-span-3">
             <div className="card-modern h-full flex flex-col">
-              <div className="flex items-center justify-between p-4 border-b border-gray-100">
+              <div className="flex items-center justify-between p-4 border-b border-gray-100 group">
                 <div className="flex items-center space-x-3">
                   <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-xl">
                     <StickyNote className="w-4 h-4 text-white" />
@@ -1088,9 +1145,31 @@ Format as a clear timeline with dates/periods and descriptions. Focus on the tem
                     <p className="text-xs text-gray-500">Capture your insights</p>
                   </div>
                 </div>
-                <span className="text-xs font-medium text-yellow-600 bg-yellow-50 px-1.5 py-0.5 rounded">
-                  {notes.length}
-                </span>
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs font-medium text-yellow-600 bg-yellow-50 px-1.5 py-0.5 rounded">
+                    {notes.length}
+                  </span>
+                  
+                  {/* Hover Actions */}
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
+                    <button
+                      onClick={exportNotesToPDF}
+                      disabled={notes.length === 0}
+                      className="p-1 hover:bg-yellow-100 hover:text-yellow-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Export all notes to file"
+                    >
+                      <FileDown className="w-3 h-3 text-gray-500" />
+                    </button>
+                    <button
+                      onClick={clearAllNotes}
+                      disabled={notes.length === 0}
+                      className="p-1 hover:bg-red-100 hover:text-red-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Clear all notes"
+                    >
+                      <Trash className="w-3 h-3 text-gray-500" />
+                    </button>
+                  </div>
+                </div>
               </div>
               
               {/* Action Buttons */}
