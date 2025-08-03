@@ -19,7 +19,11 @@ import {
   Clock,
   CheckCircle2,
   X,
-  Check
+  Check,
+  BookOpenCheck,
+  FileBarChart,
+  HelpCircle,
+  Calendar
 } from 'lucide-react';
 
 export const NotebookPage: React.FC = () => {
@@ -42,6 +46,7 @@ export const NotebookPage: React.FC = () => {
   // Note state
   const [newNote, setNewNote] = useState('');
   const [creatingNote, setCreatingNote] = useState(false);
+  const [generatingNote, setGeneratingNote] = useState<string | null>(null);
   
   // Upload state
   const [uploading, setUploading] = useState(false);
@@ -286,6 +291,160 @@ export const NotebookPage: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to delete note:', error);
+    }
+  };
+
+  // Note generation functions
+  const generateStudyGuide = async () => {
+    if (selectedDocuments.size === 0) {
+      alert('Please select at least one document to generate a study guide.');
+      return;
+    }
+
+    setGeneratingNote('Study Guide');
+    try {
+      const selectedDocIds = Array.from(selectedDocuments);
+      console.log('🔍 Generating Study Guide with documents:', selectedDocIds);
+      
+      const prompt = `Create a comprehensive Study Guide based on the selected documents. Structure it with the following sections:
+
+1. **Core Concepts & Functionality** - Key concepts, definitions, and how things work
+2. **Applications** - Practical uses, implementation examples, and real-world scenarios  
+3. **Limitations & Best Practices** - What to avoid, constraints, and recommended approaches
+4. **Quiz** - 5-10 questions to test understanding (with answers)
+5. **Glossary** - Important terms and their definitions
+
+Make it educational and well-structured for learning purposes.`;
+
+      console.log('🔍 Sending chat message...');
+      const response = await apiService.sendMessage(id!, prompt, selectedDocIds);
+      console.log('✅ Chat response received:', response);
+      
+      // Add to chat history first (this part we know works)
+      setChatHistory(prevHistory => [...prevHistory, response]);
+      
+      // Create a note from the response
+      console.log('🔍 Creating note with AI response...');
+      console.log('🔍 Note content length:', response.ai_response?.length);
+      console.log('🔍 Notebook ID:', id);
+      
+      // Truncate content if it's too long (some databases have limits)
+      let noteContent = response.ai_response;
+      if (noteContent && noteContent.length > 10000) {
+        noteContent = noteContent.substring(0, 10000) + '\n\n... (Content truncated due to length)';
+        console.log('⚠️ Content truncated due to length');
+      }
+      
+      const note = await apiService.createNote(id!, noteContent, 'ai_generated');
+      console.log('✅ Note created:', note);
+      
+      setNotes([note, ...notes]);
+      console.log('✅ Study Guide generation completed successfully');
+    } catch (error) {
+      console.error('❌ Failed to generate study guide:', error);
+      console.error('❌ Error details:', {
+        name: (error as any)?.name,
+        message: (error as any)?.message,
+        stack: (error as any)?.stack,
+        response: (error as any)?.response?.data
+      });
+      alert(`Failed to generate study guide: ${(error as any)?.message || 'Unknown error'}. Please try again.`);
+    } finally {
+      setGeneratingNote(null);
+    }
+  };
+
+  const generateBriefingDoc = async () => {
+    if (selectedDocuments.size === 0) {
+      alert('Please select at least one document to generate a briefing document.');
+      return;
+    }
+
+    setGeneratingNote('Briefing Doc');
+    try {
+      const selectedDocIds = Array.from(selectedDocuments);
+      const prompt = `Create a concise Management Briefing Document based on the selected documents. This should be:
+
+- **Executive Summary** - Key points in 2-3 sentences
+- **Main Findings** - Most important insights and information
+- **Business Impact** - How this affects operations, strategy, or decisions
+- **Recommendations** - Actionable next steps
+- **Risk Considerations** - Potential issues or concerns
+
+Keep it professional, concise, and suitable for management review. Focus on business value and decision-making insights.`;
+
+      const response = await apiService.sendMessage(id!, prompt, selectedDocIds);
+      
+      // Create a note from the response
+      const note = await apiService.createNote(id!, response.ai_response, 'ai_generated');
+      setNotes([note, ...notes]);
+    } catch (error) {
+      console.error('Failed to generate briefing document:', error);
+      alert('Failed to generate briefing document. Please try again.');
+    } finally {
+      setGeneratingNote(null);
+    }
+  };
+
+  const generateFAQ = async () => {
+    if (selectedDocuments.size === 0) {
+      alert('Please select at least one document to generate an FAQ.');
+      return;
+    }
+
+    setGeneratingNote('FAQ');
+    try {
+      const selectedDocIds = Array.from(selectedDocuments);
+      const prompt = `Create a comprehensive FAQ (Frequently Asked Questions) based on the selected documents. Include:
+
+- **Common Questions** - What users typically ask about this topic
+- **Clear Answers** - Concise, helpful responses based on the document content
+- **Troubleshooting** - Common issues and their solutions
+- **Getting Started** - Basic questions for beginners
+
+Format as Q&A pairs, organized by topic if applicable. Make it user-friendly and practical.`;
+
+      const response = await apiService.sendMessage(id!, prompt, selectedDocIds);
+      
+      // Create a note from the response
+      const note = await apiService.createNote(id!, response.ai_response, 'ai_generated');
+      setNotes([note, ...notes]);
+    } catch (error) {
+      console.error('Failed to generate FAQ:', error);
+      alert('Failed to generate FAQ. Please try again.');
+    } finally {
+      setGeneratingNote(null);
+    }
+  };
+
+  const generateTimeline = async () => {
+    if (selectedDocuments.size === 0) {
+      alert('Please select at least one document to generate a timeline.');
+      return;
+    }
+
+    setGeneratingNote('Timeline');
+    try {
+      const selectedDocIds = Array.from(selectedDocuments);
+      const prompt = `Create a chronological Timeline based on the selected documents. Include:
+
+- **Key Events** - Important dates, milestones, or developments
+- **Evolution** - How things changed over time
+- **Milestones** - Significant achievements or turning points
+- **Future Outlook** - Projected developments or trends (if mentioned)
+
+Format as a clear timeline with dates/periods and descriptions. Focus on the temporal progression of events, ideas, or developments mentioned in the documents.`;
+
+      const response = await apiService.sendMessage(id!, prompt, selectedDocIds);
+      
+      // Create a note from the response
+      const note = await apiService.createNote(id!, response.ai_response, 'ai_generated');
+      setNotes([note, ...notes]);
+    } catch (error) {
+      console.error('Failed to generate timeline:', error);
+      alert('Failed to generate timeline. Please try again.');
+    } finally {
+      setGeneratingNote(null);
     }
   };
 
@@ -781,6 +940,63 @@ export const NotebookPage: React.FC = () => {
                 </span>
               </div>
               
+              {/* Action Buttons */}
+              <div className="p-4 border-b border-gray-100">
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <button
+                    onClick={generateStudyGuide}
+                    disabled={generatingNote !== null}
+                    className="flex items-center justify-center px-2 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed min-w-0"
+                  >
+                    {generatingNote === 'Study Guide' ? (
+                      <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-2"></div>
+                    ) : (
+                      <BookOpenCheck className="w-4 h-4 mr-2 text-gray-600" />
+                    )}
+                    <span className="text-gray-700 font-bold whitespace-nowrap" style={{ fontSize: '10px' }}>Study guide</span>
+                  </button>
+                  
+                  <button
+                    onClick={generateBriefingDoc}
+                    disabled={generatingNote !== null}
+                    className="flex items-center justify-center px-2 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed min-w-0"
+                  >
+                    {generatingNote === 'Briefing Doc' ? (
+                      <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-2"></div>
+                    ) : (
+                      <FileBarChart className="w-4 h-4 mr-2 text-gray-600" />
+                    )}
+                    <span className="text-gray-700 font-bold whitespace-nowrap" style={{ fontSize: '10px' }}>Briefing doc</span>
+                  </button>
+                  
+                  <button
+                    onClick={generateFAQ}
+                    disabled={generatingNote !== null}
+                    className="flex items-center justify-center px-2 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed min-w-0"
+                  >
+                    {generatingNote === 'FAQ' ? (
+                      <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-2"></div>
+                    ) : (
+                      <HelpCircle className="w-4 h-4 mr-2 text-gray-600" />
+                    )}
+                    <span className="text-gray-700 font-bold whitespace-nowrap" style={{ fontSize: '10px' }}>FAQ</span>
+                  </button>
+                  
+                  <button
+                    onClick={generateTimeline}
+                    disabled={generatingNote !== null}
+                    className="flex items-center justify-center px-2 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed min-w-0"
+                  >
+                    {generatingNote === 'Timeline' ? (
+                      <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-2"></div>
+                    ) : (
+                      <Calendar className="w-4 h-4 mr-2 text-gray-600" />
+                    )}
+                    <span className="text-gray-700 font-bold whitespace-nowrap" style={{ fontSize: '10px' }}>Timeline</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Create Note Form */}
               <div className="p-4 border-b border-gray-100">
                 <form onSubmit={createNote} className="space-y-3">
