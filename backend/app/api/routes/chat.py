@@ -24,11 +24,12 @@ async def send_message(
         )
     
     try:
-        # Generate AI response using RAG
+        # Generate AI response using RAG with selected documents
         ai_response, metadata = await rag_service.generate_response(
             question=message.user_prompt,
             notebook_id=message.notebook_id,
-            user_id=current_user["id"]
+            user_id=current_user["id"],
+            selected_document_ids=message.selected_document_ids
         )
         
         chat_id = str(uuid.uuid4())

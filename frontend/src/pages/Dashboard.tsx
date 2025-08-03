@@ -13,10 +13,8 @@ import {
   Brain,
   Calendar,
   Search,
-  Filter,
   Grid3X3,
-  List,
-  MoreVertical
+  List
 } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {

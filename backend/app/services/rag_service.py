@@ -13,7 +13,7 @@ class RAGService:
         self.embedding_service = EmbeddingService()
         self.llm_model = genai.GenerativeModel(settings.llm_model)
     
-    async def generate_response(self, question: str, notebook_id: str, user_id: str) -> Tuple[str, Dict[str, Any]]:
+    async def generate_response(self, question: str, notebook_id: str, user_id: str, selected_document_ids: List[str] = None) -> Tuple[str, Dict[str, Any]]:
         """Generate AI response using RAG (Retrieval-Augmented Generation)"""
         
         try:
@@ -21,6 +21,7 @@ class RAGService:
             print(f"Question: {question}")
             print(f"Notebook ID: {notebook_id}")
             print(f"User ID: {user_id}")
+            print(f"Selected document IDs: {selected_document_ids}")
             
             # 1. Retrieve relevant document chunks
             print("Step 1: Retrieving relevant document chunks...")
@@ -28,7 +29,8 @@ class RAGService:
                 query=question,
                 notebook_id=notebook_id,
                 user_id=user_id,
-                limit=5
+                limit=5,
+                selected_document_ids=selected_document_ids
             )
             print(f"Found {len(relevant_chunks)} relevant chunks")
             if relevant_chunks:
@@ -37,7 +39,7 @@ class RAGService:
             # Fallback: If no chunks found, get document content directly
             if not relevant_chunks:
                 print("No chunks found via vector search, trying fallback...")
-                relevant_chunks = await self._fallback_document_search(notebook_id, question)
+                relevant_chunks = await self._fallback_document_search(notebook_id, question, selected_document_ids)
                 print(f"Fallback found {len(relevant_chunks)} chunks")
             
             # 2. Get document information for citations
@@ -72,12 +74,19 @@ class RAGService:
             traceback.print_exc()
             raise Exception(f"Failed to generate RAG response: {str(e)}")
     
-    async def _fallback_document_search(self, notebook_id: str, question: str) -> List[Dict[str, Any]]:
+    async def _fallback_document_search(self, notebook_id: str, question: str, selected_document_ids: List[str] = None) -> List[Dict[str, Any]]:
         """Fallback: Get document content directly when vector search fails"""
         from app.models.database import supabase_admin
         
-        # Get all documents for this notebook
-        result = supabase_admin.table("documents").select("id, filename, content").eq("notebook_id", notebook_id).execute()
+        # Get documents for this notebook, filtered by selection if provided
+        query = supabase_admin.table("documents").select("id, filename, content").eq("notebook_id", notebook_id)
+        
+        # If specific documents are selected, filter to only those
+        if selected_document_ids:
+            query = query.in_("id", selected_document_ids)
+            print(f"Fallback filtering to selected documents: {selected_document_ids}")
+        
+        result = query.execute()
         
         chunks = []
         for doc in result.data:

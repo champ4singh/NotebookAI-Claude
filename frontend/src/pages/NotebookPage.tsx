@@ -8,7 +8,6 @@ import {
   Send, 
   Save, 
   FileText, 
-  MessageSquare, 
   StickyNote, 
   Brain,
   Plus,
@@ -16,13 +15,11 @@ import {
   Download,
   Eye,
   Sparkles,
-  Paperclip,
-  Zap,
   Users,
   Clock,
   CheckCircle2,
-  AlertCircle,
-  X
+  X,
+  Check
 } from 'lucide-react';
 
 export const NotebookPage: React.FC = () => {
@@ -49,6 +46,10 @@ export const NotebookPage: React.FC = () => {
   // Upload state
   const [uploading, setUploading] = useState(false);
   
+  // Document selection state
+  const [selectedDocuments, setSelectedDocuments] = useState<Set<string>>(new Set());
+  const [selectAllDocuments, setSelectAllDocuments] = useState(false);
+  
   // Document viewer state
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [documentContent, setDocumentContent] = useState<string>('');
@@ -58,9 +59,6 @@ export const NotebookPage: React.FC = () => {
   // Note viewer state
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [showNoteViewer, setShowNoteViewer] = useState(false);
-  
-  // Active tab state
-  const [activeTab, setActiveTab] = useState<'chat' | 'documents' | 'notes'>('chat');
 
   useEffect(() => {
     if (id) {
@@ -170,7 +168,11 @@ export const NotebookPage: React.FC = () => {
     setSendingMessage(true);
 
     try {
-      const response = await apiService.sendMessage(id!, userMessage);
+      // Send selected document IDs with the message
+      const selectedDocIds = Array.from(selectedDocuments);
+      console.log('Sending message with selected documents:', selectedDocIds);
+      
+      const response = await apiService.sendMessage(id!, userMessage, selectedDocIds);
       // Add the new message to chat history and refresh the display
       setChatHistory(prevHistory => [...prevHistory, response]);
     } catch (error) {
@@ -287,6 +289,39 @@ export const NotebookPage: React.FC = () => {
     }
   };
 
+  // Document selection handlers
+  const handleDocumentSelect = (docId: string, isSelected: boolean) => {
+    const newSelected = new Set(selectedDocuments);
+    if (isSelected) {
+      newSelected.add(docId);
+    } else {
+      newSelected.delete(docId);
+    }
+    setSelectedDocuments(newSelected);
+    
+    // Update select all state
+    setSelectAllDocuments(newSelected.size === documents.length && documents.length > 0);
+  };
+
+  const handleSelectAllDocuments = (isSelected: boolean) => {
+    if (isSelected) {
+      setSelectedDocuments(new Set(documents.map(doc => doc.id)));
+    } else {
+      setSelectedDocuments(new Set());
+    }
+    setSelectAllDocuments(isSelected);
+  };
+
+  // Update select all state when documents change
+  useEffect(() => {
+    if (documents.length === 0) {
+      setSelectAllDocuments(false);
+      setSelectedDocuments(new Set());
+    } else {
+      setSelectAllDocuments(selectedDocuments.size === documents.length);
+    }
+  }, [documents.length, selectedDocuments.size]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
@@ -396,14 +431,37 @@ export const NotebookPage: React.FC = () => {
                     <FileText className="w-4 h-4 text-white" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900 text-xs">Documents</h3>
-                    <p className="text-xs text-gray-500">Your uploaded files</p>
+                    <h3 className="font-semibold text-gray-900 text-sm">Sources</h3>
                   </div>
                 </div>
-                <span className="text-xs font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
-                  {documents.length}
+                <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                  {documents.length} sources
                 </span>
               </div>
+              
+              {/* Select All Option */}
+              {documents.length > 0 && (
+                <div className="p-4 border-b border-gray-100">
+                  <label className="flex items-center space-x-3 cursor-pointer group">
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        checked={selectAllDocuments}
+                        onChange={(e) => handleSelectAllDocuments(e.target.checked)}
+                        className="sr-only"
+                      />
+                      <div className={`flex items-center justify-center w-5 h-5 border-2 rounded transition-all ${
+                        selectAllDocuments 
+                          ? 'bg-blue-600 border-blue-600' 
+                          : 'border-gray-300 group-hover:border-blue-400'
+                      }`}>
+                        {selectAllDocuments && <Check className="w-3 h-3 text-white" />}
+                      </div>
+                    </div>
+                    <span className="text-sm font-medium text-gray-900">Select all sources</span>
+                  </label>
+                </div>
+              )}
               
               <div className="flex-1 overflow-y-auto p-3" style={{scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 #f1f5f9'}}>
                 {documents.length === 0 ? (
@@ -425,47 +483,70 @@ export const NotebookPage: React.FC = () => {
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    {documents.map((doc, index) => (
-                      <div
-                        key={doc.id}
-                        className="bg-white border border-gray-200 rounded-xl p-3 hover:shadow-md transition-all duration-200 group"
-                      >
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-center space-x-2 flex-1 min-w-0 pr-2">
-                            <div className="flex items-center justify-center w-6 h-6 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex-shrink-0">
-                              <FileText className="w-3 h-3 text-white" />
+                  <div className="space-y-3">
+                    {documents.map((doc) => {
+                      const isSelected = selectedDocuments.has(doc.id);
+                      return (
+                        <div
+                          key={doc.id}
+                          className={`border-2 rounded-lg p-3 transition-all duration-200 cursor-pointer ${
+                            isSelected ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                          }`}
+                          onClick={() => handleDocumentSelect(doc.id, !isSelected)}
+                        >
+                          <div className="flex items-center space-x-3">
+                            {/* Checkbox */}
+                            <div className="relative">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => {}}
+                                className="sr-only"
+                              />
+                              <div className={`flex items-center justify-center w-5 h-5 border-2 rounded transition-all ${
+                                isSelected 
+                                  ? 'bg-blue-600 border-blue-600' 
+                                  : 'border-gray-300 hover:border-blue-400'
+                              }`}>
+                                {isSelected && <Check className="w-3 h-3 text-white" />}
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-gray-900 text-xs truncate">{doc.filename}</h4>
+                            
+                            {/* Document Info */}
+                            <div className="flex items-center space-x-2 flex-1 min-w-0">
+                              <FileText className="w-4 h-4 text-red-500 flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-medium text-gray-900 text-sm truncate">{doc.filename}</h4>
+                              </div>
                             </div>
-                          </div>
-                          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1 flex-shrink-0">
-                            <button 
-                              onClick={() => viewDocument(doc)}
-                              className="p-1 hover:bg-blue-50 hover:text-blue-600 rounded transition-colors"
-                              title="View"
-                            >
-                              <Eye className="w-3 h-3 text-gray-500" />
-                            </button>
-                            <button 
-                              onClick={() => deleteDocument(doc.id)}
-                              className="p-1 hover:bg-red-50 hover:text-red-600 rounded transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-3 h-3 text-gray-500" />
-                            </button>
+                            
+                            {/* Action Buttons */}
+                            <div className="flex space-x-1 flex-shrink-0">
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  viewDocument(doc);
+                                }}
+                                className="p-1 hover:bg-blue-100 hover:text-blue-600 rounded transition-colors"
+                                title="View"
+                              >
+                                <Eye className="w-4 h-4 text-gray-500" />
+                              </button>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteDocument(doc.id);
+                                }}
+                                className="p-1 hover:bg-red-100 hover:text-red-600 rounded transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4 text-gray-500" />
+                              </button>
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">{doc.file_type}</p>
-                          <div className="flex items-center space-x-1 text-green-600">
-                            <CheckCircle2 className="w-3 h-3" />
-                            <span className="font-medium text-xs">Ready</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -482,7 +563,12 @@ export const NotebookPage: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="font-bold text-gray-900">AI Chat</h3>
-                    <p className="text-sm text-gray-500">Ask about your documents</p>
+                    <p className="text-sm text-gray-500">
+                      {selectedDocuments.size > 0 
+                        ? `Using ${selectedDocuments.size} selected source${selectedDocuments.size !== 1 ? 's' : ''}`
+                        : 'Ask about your documents'
+                      }
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-4">
@@ -620,6 +706,20 @@ export const NotebookPage: React.FC = () => {
 
               {/* Chat Input - Sticky at bottom */}
               <div className="border-t border-gray-100 p-4 bg-white mt-auto">
+                {/* Selected Documents Indicator */}
+                {selectedDocuments.size > 0 && (
+                  <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center space-x-2 text-sm">
+                      <div className="flex items-center justify-center w-4 h-4 bg-blue-600 rounded">
+                        <span className="text-white font-bold text-xs">{selectedDocuments.size}</span>
+                      </div>
+                      <span className="text-blue-700 font-medium">
+                        {selectedDocuments.size} source{selectedDocuments.size !== 1 ? 's' : ''} selected for this query
+                      </span>
+                    </div>
+                  </div>
+                )}
+                
                 <form onSubmit={sendMessage} className="flex items-end space-x-3">
                   <div className="flex-1">
                     <textarea
@@ -631,7 +731,10 @@ export const NotebookPage: React.FC = () => {
                           sendMessage(e);
                         }
                       }}
-                      placeholder="Ask about your documents..."
+                      placeholder={selectedDocuments.size > 0 
+                        ? `Ask about your ${selectedDocuments.size} selected source${selectedDocuments.size !== 1 ? 's' : ''}...`
+                        : "Ask about your documents..."
+                      }
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl resize-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-all duration-200 text-sm shadow-sm"
                       rows={1}
                       style={{ minHeight: '40px', maxHeight: '120px' }}
@@ -652,6 +755,9 @@ export const NotebookPage: React.FC = () => {
                 </form>
                 <p className="text-xs text-gray-500 mt-1.5">
                   Press Enter to send • Shift + Enter for new line
+                  {selectedDocuments.size === 0 && documents.length > 0 && (
+                    <span className="text-amber-600 ml-2">• Select sources in the left panel to focus your query</span>
+                  )}
                 </p>
               </div>
             </div>
@@ -719,7 +825,7 @@ export const NotebookPage: React.FC = () => {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {notes.map((note, index) => (
+                    {notes.map((note) => (
                       <div
                         key={note.id}
                         className="bg-gradient-to-br from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl p-3 group hover:shadow-md transition-all duration-200 relative"

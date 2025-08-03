@@ -34,7 +34,7 @@ FastAPI backend for the NotebookAI application.
 4. **Run the Application**
    ```bash
    uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-   ```
+   ```@Snip.png
 
 ## API Endpoints
 

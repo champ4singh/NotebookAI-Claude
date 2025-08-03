@@ -56,7 +56,7 @@ class EmbeddingService:
             traceback.print_exc()
             raise Exception(f"Failed to create embeddings: {str(e)}")
     
-    async def search_similar(self, query: str, notebook_id: str, user_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+    async def search_similar(self, query: str, notebook_id: str, user_id: str, limit: int = 10, selected_document_ids: List[str] = None) -> List[Dict[str, Any]]:
         """Search for similar document chunks using vector similarity"""
         
         try:
@@ -65,9 +65,17 @@ class EmbeddingService:
             print(f"Notebook ID: {notebook_id}")
             print(f"User ID: {user_id}")
             print(f"Limit: {limit}")
+            print(f"Selected document IDs: {selected_document_ids}")
             
             # First, let's check what documents exist for this notebook
-            docs_result = supabase_admin.table("documents").select("id, filename, embedding_id").eq("notebook_id", notebook_id).execute()
+            docs_query = supabase_admin.table("documents").select("id, filename, embedding_id").eq("notebook_id", notebook_id)
+            
+            # If specific documents are selected, filter to only those
+            if selected_document_ids:
+                docs_query = docs_query.in_("id", selected_document_ids)
+                print(f"Filtering to selected documents only: {selected_document_ids}")
+            
+            docs_result = docs_query.execute()
             print(f"Documents in notebook: {docs_result.data}")
             
             # Check if there are embeddings for these documents
@@ -77,6 +85,9 @@ class EmbeddingService:
                 print(f"Embeddings for this notebook: {len(embeddings_for_notebook.data)} chunks")
                 for emb in embeddings_for_notebook.data[:2]:
                     print(f"  - Doc ID: {emb['document_id']}, Content: {emb['content'][:50]}...")
+            else:
+                print("No documents found for the criteria")
+                return []
             
             # Generate query embedding
             print("Generating query embedding...")
@@ -96,8 +107,18 @@ class EmbeddingService:
                 }
             ).execute()
             
-            print(f"RPC result: {result}")
+            print(f"RPC result: data={result.data} count={result.count}")
             print(f"Found {len(result.data)} matches")
+            
+            # If we have selected documents, filter the results to only include those documents
+            if selected_document_ids and result.data:
+                print(f"Filtering results to selected documents: {selected_document_ids}")
+                filtered_results = [
+                    chunk for chunk in result.data 
+                    if chunk.get('document_id') in selected_document_ids
+                ]
+                print(f"After filtering: {len(filtered_results)} matches from selected documents")
+                return filtered_results
             
             return result.data
             

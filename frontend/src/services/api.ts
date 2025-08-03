@@ -150,10 +150,11 @@ class ApiService {
   }
 
   // Chat endpoints
-  async sendMessage(notebookId: string, message: string): Promise<ChatMessage> {
+  async sendMessage(notebookId: string, message: string, selectedDocumentIds?: string[]): Promise<ChatMessage> {
     const response = await this.api.post('/chat/', {
       user_prompt: message,
       notebook_id: notebookId,
+      selected_document_ids: selectedDocumentIds || [],
     });
     return response.data;
   }

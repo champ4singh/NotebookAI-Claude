@@ -76,6 +76,7 @@ class Document(DocumentBase):
 class ChatMessage(BaseModel):
     user_prompt: str
     notebook_id: str
+    selected_document_ids: Optional[List[str]] = []
 
 class ChatResponse(BaseModel):
     id: str
