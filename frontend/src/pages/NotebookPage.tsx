@@ -401,30 +401,360 @@ export const NotebookPage: React.FC = () => {
     }
 
     try {
-      // Create PDF content
-      let pdfContent = `# Notes Export - ${notebook?.title}\n\n`;
-      pdfContent += `Generated on: ${new Date().toLocaleDateString()}\n`;
-      pdfContent += `Total Notes: ${notes.length}\n\n`;
-      pdfContent += '---\n\n';
+      const fileName = `notes-export-${notebook?.title || 'notebook'}-${new Date().toISOString().split('T')[0]}`;
+      
+      // Create Markdown content
+      let markdownContent = `# Notes Export - ${notebook?.title}\n\n`;
+      markdownContent += `Generated on: ${new Date().toLocaleDateString()}\n`;
+      markdownContent += `Total Notes: ${notes.length}\n\n`;
+      markdownContent += '---\n\n';
 
       notes.forEach((note, index) => {
-        pdfContent += `## Note ${index + 1}\n\n`;
-        pdfContent += `**Type:** ${note.source_type === 'ai_generated' ? 'AI Generated' : 'Manual'}\n\n`;
-        pdfContent += `**Created:** ${new Date(note.created_at).toLocaleDateString()}\n\n`;
-        pdfContent += `**Content:**\n\n${note.content}\n\n`;
-        pdfContent += '---\n\n';
+        markdownContent += `## Note ${index + 1}\n\n`;
+        markdownContent += `**Type:** ${note.source_type === 'ai_generated' ? 'AI Generated' : 'Manual'}\n\n`;
+        markdownContent += `**Created:** ${new Date(note.created_at).toLocaleDateString()}\n\n`;
+        markdownContent += `**Content:**\n\n${note.content}\n\n`;
+        markdownContent += '---\n\n';
       });
 
-      // Create and download file
-      const blob = new Blob([pdfContent], { type: 'text/markdown' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `notes-export-${notebook?.title || 'notebook'}-${new Date().toISOString().split('T')[0]}.md`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // Export Markdown file
+      const markdownBlob = new Blob([markdownContent], { type: 'text/markdown' });
+      const markdownUrl = URL.createObjectURL(markdownBlob);
+      const markdownLink = document.createElement('a');
+      markdownLink.href = markdownUrl;
+      markdownLink.download = `${fileName}.md`;
+      document.body.appendChild(markdownLink);
+      markdownLink.click();
+      document.body.removeChild(markdownLink);
+      URL.revokeObjectURL(markdownUrl);
+
+      // Create PDF using browser's print functionality
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Notes Export - ${notebook?.title}</title>
+            <style>
+              @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+              
+              * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+              }
+              
+              body {
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+                line-height: 1.7;
+                color: #1f2937;
+                background: #ffffff;
+                font-size: 11pt;
+              }
+              
+              .title-page {
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+                text-align: center;
+                padding: 2rem;
+                page-break-after: always;
+              }
+              
+              .title-page h1 {
+                font-size: 2.5rem;
+                font-weight: 700;
+                color: #1e40af;
+                margin-bottom: 1rem;
+                letter-spacing: -0.02em;
+              }
+              
+              .title-page .subtitle {
+                font-size: 1.2rem;
+                color: #6b7280;
+                margin-bottom: 3rem;
+                font-weight: 300;
+              }
+              
+              .title-metadata {
+                background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+                padding: 2rem;
+                border-radius: 12px;
+                border: 1px solid #e2e8f0;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                max-width: 400px;
+                width: 100%;
+              }
+              
+              .title-metadata .meta-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 0.75rem 0;
+                border-bottom: 1px solid #e5e7eb;
+                font-size: 1rem;
+              }
+              
+              .title-metadata .meta-row:last-child {
+                border-bottom: none;
+              }
+              
+              .meta-label {
+                font-weight: 600;
+                color: #374151;
+              }
+              
+              .meta-value {
+                font-weight: 400;
+                color: #6b7280;
+              }
+              
+              .note-page {
+                min-height: 100vh;
+                padding: 3rem;
+                page-break-before: always;
+                page-break-after: always;
+                display: flex;
+                flex-direction: column;
+              }
+              
+              .note-page:last-child {
+                page-break-after: auto;
+              }
+              
+              .note-header {
+                text-align: center;
+                margin-bottom: 3rem;
+                padding-bottom: 1.5rem;
+                border-bottom: 2px solid #e5e7eb;
+              }
+              
+              .note-number {
+                font-size: 2rem;
+                font-weight: 700;
+                color: #1e40af;
+                margin-bottom: 0.5rem;
+                letter-spacing: -0.02em;
+              }
+              
+              .note-meta {
+                display: flex;
+                justify-content: center;
+                gap: 2rem;
+                margin-top: 1rem;
+              }
+              
+              .note-type-badge {
+                background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+                color: #1e40af;
+                padding: 0.5rem 1rem;
+                border-radius: 8px;
+                font-size: 0.85rem;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                border: 1px solid #bfdbfe;
+              }
+              
+              .note-date-badge {
+                background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+                color: #374151;
+                padding: 0.5rem 1rem;
+                border-radius: 8px;
+                font-size: 0.85rem;
+                font-weight: 500;
+                border: 1px solid #d1d5db;
+              }
+              
+              .note-content {
+                flex: 1;
+                margin-top: 2rem;
+                padding: 2rem;
+                background: #fafbfc;
+                border-radius: 12px;
+                border: 1px solid #e5e7eb;
+                box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+              }
+              
+              .note-content-text {
+                font-size: 11.5pt;
+                line-height: 1.8;
+                color: #374151;
+                text-align: justify;
+                text-indent: 1.5rem;
+                hyphens: auto;
+                word-wrap: break-word;
+              }
+              
+              .note-content-text p {
+                margin-bottom: 1rem;
+                text-indent: 1.5rem;
+              }
+              
+              .note-content-text h1, 
+              .note-content-text h2, 
+              .note-content-text h3, 
+              .note-content-text h4, 
+              .note-content-text h5, 
+              .note-content-text h6 {
+                color: #1f2937;
+                font-weight: 600;
+                margin: 1.5rem 0 1rem 0;
+                text-indent: 0;
+              }
+              
+              .note-content-text ul, 
+              .note-content-text ol {
+                margin: 1rem 0;
+                padding-left: 2rem;
+              }
+              
+              .note-content-text li {
+                margin-bottom: 0.5rem;
+                text-indent: 0;
+              }
+              
+              .note-content-text blockquote {
+                border-left: 4px solid #3b82f6;
+                padding-left: 1rem;
+                margin: 1rem 0;
+                font-style: italic;
+                color: #6b7280;
+                text-indent: 0;
+              }
+              
+              .note-content-text code {
+                background: #f1f5f9;
+                padding: 0.2rem 0.4rem;
+                border-radius: 4px;
+                font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+                font-size: 0.9em;
+              }
+              
+              .page-footer {
+                position: fixed;
+                bottom: 1rem;
+                right: 2rem;
+                font-size: 0.8rem;
+                color: #9ca3af;
+                font-weight: 300;
+              }
+              
+              @media print {
+                body {
+                  margin: 0;
+                  padding: 0;
+                  print-color-adjust: exact;
+                  -webkit-print-color-adjust: exact;
+                }
+                
+                .note-page {
+                  margin: 0;
+                  padding: 2rem;
+                }
+                
+                .title-page {
+                  padding: 1rem;
+                }
+                
+                @page {
+                  margin: 1in;
+                  size: A4;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            <!-- Title Page -->
+            <div class="title-page">
+              <h1>Notes Export</h1>
+              <div class="subtitle">${notebook?.title || 'Notebook'}</div>
+              <div class="title-metadata">
+                <div class="meta-row">
+                  <span class="meta-label">Generated on:</span>
+                  <span class="meta-value">${new Date().toLocaleDateString('en-US', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}</span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-label">Total Notes:</span>
+                  <span class="meta-value">${notes.length}</span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-label">Export Format:</span>
+                  <span class="meta-value">PDF Document</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Individual Note Pages -->
+            ${notes.map((note, index) => {
+              // Process note content for better formatting
+              let processedContent = note.content
+                .replace(/\n\s*\n/g, '</p><p>')  // Convert double newlines to paragraphs
+                .replace(/\n/g, '<br>')          // Convert single newlines to breaks
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold text
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')             // Italic text
+                .replace(/`(.*?)`/g, '<code>$1</code>')           // Inline code
+                .replace(/^### (.*$)/gm, '<h3>$1</h3>')          // H3 headers
+                .replace(/^## (.*$)/gm, '<h2>$1</h2>')           // H2 headers  
+                .replace(/^# (.*$)/gm, '<h1>$1</h1>')            // H1 headers
+                .replace(/^- (.*$)/gm, '<ul><li>$1</li></ul>')    // Simple lists
+                .replace(/<\/ul>\s*<ul>/g, '');                   // Merge consecutive lists
+              
+              // Wrap in paragraphs if not already formatted
+              if (!processedContent.includes('<p>') && !processedContent.includes('<h') && !processedContent.includes('<ul>')) {
+                processedContent = `<p>${processedContent}</p>`;
+              }
+              
+              return `
+                <div class="note-page">
+                  <div class="note-header">
+                    <div class="note-number">Note ${index + 1}</div>
+                    <div class="note-meta">
+                      <div class="note-type-badge">
+                        ${note.source_type === 'ai_generated' ? 'AI Generated' : 'Manual'}
+                      </div>
+                      <div class="note-date-badge">
+                        ${new Date(note.created_at).toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="note-content">
+                    <div class="note-content-text">
+                      ${processedContent}
+                    </div>
+                  </div>
+                  
+                  <div class="page-footer">
+                    Page ${index + 2} of ${notes.length + 1}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </body>
+          </html>
+        `);
+        printWindow.document.close();
+        
+        // Wait a moment for content to load, then print
+        setTimeout(() => {
+          printWindow.print();
+          printWindow.close();
+        }, 500);
+      }
+
     } catch (error) {
       console.error('Failed to export notes:', error);
       alert('Failed to export notes. Please try again.');
